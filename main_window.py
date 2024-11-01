@@ -50,6 +50,7 @@ class MainWindow(QMainWindow):
         self.widget.setLayout(self.hlayout)
         self.setCentralWidget(self.widget)
 
+    # Получаем список для фильтра
     def getListFilter(self):
         genders = self.db.query(hotel.Gender).all()
         rooms = self.db.query(hotel.Room).all()
@@ -57,6 +58,7 @@ class MainWindow(QMainWindow):
         self.gender_list = ["Любой"] + [gender.gender_name for gender in genders]
         self.room_list = ["Любой"] + [room.name for room in rooms]
 
+    # Применяем фильтры
     def applyClientFilters(self):
         last_name_filter = self.line_find.text()
         selected_gender = self.combobox.currentText()
@@ -100,7 +102,6 @@ class MainWindow(QMainWindow):
     def onClickRoom(self):
         self.line_find.setPlaceholderText("Поиск по названию номера")
         self.combobox.clear()
-        self.combobox.addItems(self.room_list)
         self.line_find.textChanged.connect(self.applyRoomFilters)
         self.combobox.currentTextChanged.connect(self.applyRoomFilters)
         self.applyRoomFilters()
@@ -130,6 +131,7 @@ class MainWindow(QMainWindow):
     def onClickService(self):
         self.line_find.setPlaceholderText("описание услуги")
         self.line_find.textChanged.connect(self.applyServiceFilters)
+        self.combobox.clear()
         self.applyServiceFilters()
 
     def applyServiceFilters(self):
