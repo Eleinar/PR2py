@@ -1,232 +1,201 @@
-
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QMainWindow, QWidget,
-QVBoxLayout, QHBoxLayout, QPushButton,QTableWidget, QTableWidgetItem,
-QLineEdit, QComboBox)
+from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QLineEdit, QComboBox)
 import hotel
-from sqlalchemy import func
+from sqlalchemy import func, or_
+from sqlalchemy.orm import joinedload
 
-        
-
-class MainWindow (QMainWindow):
-    def __init__(self, login, base):
+class MainWindow(QMainWindow):
+    def __init__(self, login=None, base=None):
         super(MainWindow, self).__init__()
-        self.setWindowTitle("Гостинница")
-        self.setMinimumSize(900,300)
+        self.setWindowTitle("Гостиница")
+        self.setMinimumSize(900, 300)
         self.db = hotel.create_connection(login, base)
-        self.client_button = QPushButton()
-        self.client_button.setText("Клиенты")
+
+        # Кнопки интерфейса
+        self.client_button = QPushButton("Клиенты")
         self.client_button.clicked.connect(self.onClickClient)
-        self.room_button = QPushButton()
-        self.room_button.setText("Номерной фонд")
+        
+        self.room_button = QPushButton("Номерной фонд")
         self.room_button.clicked.connect(self.onClickRoom)
-        self.service_button = QPushButton()
-        self.service_button.setText("Доп.Услуги")
+        
+        self.service_button = QPushButton("Доп.Услуги")
         self.service_button.clicked.connect(self.onClickService)
-        self.booking_button = QPushButton()
-        self.booking_button.setText("Бронирования")
+        
+        self.booking_button = QPushButton("Бронирования")
         self.booking_button.clicked.connect(self.onClickBooking)
-        
-        
+
+        # Поле ввода и фильтры
         self.line_find = QLineEdit()
         self.line_find.setPlaceholderText("Поиск по значению")
-        
-        
         self.combobox = QComboBox()
         self.gender_list = []
         self.room_list = []
         self.getListFilter()
-        
-        
+
+        # Компоновка
         self.v_button_layout = QVBoxLayout()
-        
         self.v_button_layout.addWidget(self.client_button)
         self.v_button_layout.addWidget(self.room_button)
         self.v_button_layout.addWidget(self.service_button)
         self.v_button_layout.addWidget(self.booking_button)
         self.v_button_layout.addWidget(self.line_find)
-        
         self.v_button_layout.addWidget(self.combobox)
-        
-        self.v_button_layout.addStretch(5) # Эта функция отвечает за пространство между элементами
-        
-        self.table = QTableWidget()
 
+        self.table = QTableWidget()
         self.hlayout = QHBoxLayout()
         self.hlayout.addLayout(self.v_button_layout)
         self.hlayout.addWidget(self.table)
+        
         self.widget = QWidget()
         self.widget.setLayout(self.hlayout)
         self.setCentralWidget(self.widget)
-        
-        
 
     def getListFilter(self):
         genders = self.db.query(hotel.Gender).all()
         rooms = self.db.query(hotel.Room).all()
         
-        for gender in genders:
-            self.gender_list.append(str(gender.gender_name))
-        for room in rooms:
-            self.room_list.append(str(room.name))
-        self.room_list.append("Любой")
-        
+        self.gender_list = ["Любой"] + [gender.gender_name for gender in genders]
+        self.room_list = ["Любой"] + [room.name for room in rooms]
 
-
-    def onClickClient(self,text=None):
-        
-        self.line_find.setPlaceholderText("Поиск по фамилии")
-        self.line_find.textChanged.connect(self.searchClient)
-        clients = self.getClients(text)
+    def applyClientFilters(self):
+        last_name_filter = self.line_find.text()
+        selected_gender = self.combobox.currentText()
+        clients = self.getClients(last_name_filter, selected_gender)
         
         self.table.clear()
-        self.table.setRowCount(self.db.query(hotel.Guest).count())
+        self.table.setRowCount(len(clients))
         self.table.setColumnCount(9)
         self.table.setHorizontalHeaderLabels(["ID", "Фамилия", "Имя", "Отчество", "Пол", "Дата рождения", "Место рождения", "Паспорт", "Телефон"])
-        
-        self.genderFilter()
-        пше
-        for i, (c) in enumerate(clients):
-            client_id = QTableWidgetItem(str(c.id))
-            client_last_name = QTableWidgetItem(str(c.last_name))
-            client_first_name = QTableWidgetItem(str(c.first_name))
-            client_middle_name = QTableWidgetItem(str(c.middle_name))
-            client_gender = QTableWidgetItem(str(c.gender_str.gender_name))
-            client_birthday = QTableWidgetItem(str(c.birth_date))
-            client_birth_place = QTableWidgetItem(str(c.birth_place))
-            client_passport = QTableWidgetItem(str(c.passport_str.passport_series) + " " + str(c.passport_str.passport_number))
-            client_phone = QTableWidgetItem(str(c.phone))
-            
-            self.table.setItem(i,0,client_id)
-            self.table.setItem(i,1,client_last_name)
-            self.table.setItem(i,2,client_first_name)
-            self.table.setItem(i,3,client_middle_name)
-            self.table.setItem(i,4,client_gender)
-            self.table.setItem(i,5,client_birthday)
-            self.table.setItem(i,6,client_birth_place)
-            self.table.setItem(i,7,client_passport)
-            self.table.setItem(i,8,client_phone)
 
-        self.table.show()
-        
-    def searchClient(self, text):
-        self.table.clear()
-        self.onClickClient(text)
-        
-        
-        
-    def getClients(self, text=None):
-        if text:
-            return self.db.query(hotel.Guest).filter(hotel.Guest.last_name.like(f"%{text}%")).all()
-        else:
-            return self.db.query(hotel.Guest).all()
-        
-    def genderFilter(self):
+        for i, c in enumerate(clients):
+            self.table.setItem(i, 0, QTableWidgetItem(str(c.id)))
+            self.table.setItem(i, 1, QTableWidgetItem(str(c.last_name)))
+            self.table.setItem(i, 2, QTableWidgetItem(str(c.first_name)))
+            self.table.setItem(i, 3, QTableWidgetItem(str(c.middle_name)))
+            self.table.setItem(i, 4, QTableWidgetItem(str(c.gender_str.gender_name)))
+            self.table.setItem(i, 5, QTableWidgetItem(str(c.birth_date)))
+            self.table.setItem(i, 6, QTableWidgetItem(str(c.birth_place)))
+            self.table.setItem(i, 7, QTableWidgetItem(f"{c.passport_str.passport_series} {c.passport_str.passport_number}"))
+            self.table.setItem(i, 8, QTableWidgetItem(str(c.phone)))
+
+    def onClickClient(self):
+        self.line_find.setPlaceholderText("Поиск по фамилии")
         self.combobox.clear()
         self.combobox.addItems(self.gender_list)
-
-
-
+        self.line_find.textChanged.connect(self.applyClientFilters)
+        self.combobox.currentTextChanged.connect(self.applyClientFilters)
+        self.applyClientFilters()
+    
+    def getClients(self, last_name_filter=None, gender_filter=None):
+        query = self.db.query(hotel.Guest).join(hotel.Gender, hotel.Guest.gender_id == hotel.Gender.id)
         
+        if last_name_filter:
+            query = query.filter(hotel.Guest.last_name.like(f"%{last_name_filter}%"))
         
-    def onClickRoom(self,text=None):
+        if gender_filter and gender_filter != "Любой":
+            query = query.filter(hotel.Gender.gender_name == gender_filter)
+
+        return query.all()
+
+    def onClickRoom(self):
         self.line_find.setPlaceholderText("Поиск по названию номера")
-        self.line_find.textChanged.connect(self.searchRoom)
-        
-        rooms = self.getRooms(text)
-        
-        self.roomFilter()
-        
-        self.table.clear()
-        self.table.setRowCount(self.db.query(hotel.Room).count())
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["ID", "Название", "Описание", "Цена"])
-        for i, (r) in enumerate(rooms):
-            room_id = QTableWidgetItem(str(r.id))
-            room_name = QTableWidgetItem(str(r.name))
-            room_descr = QTableWidgetItem(str(r.description))
-            room_price = QTableWidgetItem(str(r.price))
-            self.table.setItem(i, 0, room_id)
-            self.table.setItem(i, 1, room_name)
-            self.table.setItem(i, 2, room_descr)
-            self.table.setItem(i, 3, room_price)
-            
-    def roomFilter(self):
         self.combobox.clear()
         self.combobox.addItems(self.room_list)
-            
-            
-    def searchService(self, text):
+        self.line_find.textChanged.connect(self.applyRoomFilters)
+        self.combobox.currentTextChanged.connect(self.applyRoomFilters)
+        self.applyRoomFilters()
+
+    def applyRoomFilters(self):
+        room_name_filter = self.line_find.text()
+        selected_room = self.combobox.currentText()
+        rooms = self.getRooms(room_name_filter if selected_room == "Любой" else selected_room)
+
         self.table.clear()
-        self.onClickService(text)
-        
-        
-        
-    def getService(self, text=None):
-        if text:
-            return self.db.query(hotel.Services).filter(hotel.Services.description.like(f"%{text}%")).all()
-        else:
-            return self.db.query(hotel.Services).all()
-            
+        self.table.setRowCount(len(rooms))
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(["ID", "Название", "Описание", "Цена"])
+
+        for i, r in enumerate(rooms):
+            self.table.setItem(i, 0, QTableWidgetItem(str(r.id)))
+            self.table.setItem(i, 1, QTableWidgetItem(str(r.name)))
+            self.table.setItem(i, 2, QTableWidgetItem(str(r.description)))
+            self.table.setItem(i, 3, QTableWidgetItem(str(r.price)))
+
+    def getRooms(self, room_filter=None):
+        query = self.db.query(hotel.Room)
+        if room_filter and room_filter != "Любой":
+            query = query.filter(hotel.Room.name.like(f"%{room_filter}%"))
+        return query.all()
 
     def onClickService(self):
         self.line_find.setPlaceholderText("описание услуги")
-        self.line_find.textChanged.connect(self.searchService)
-        
-        services = self.db.query(hotel.Services).all()
+        self.line_find.textChanged.connect(self.applyServiceFilters)
+        self.applyServiceFilters()
+
+    def applyServiceFilters(self):
+        service_filter = self.line_find.text()
+        services = self.getService(service_filter)
+
         self.table.clear()
-        self.table.setRowCount(self.db.query(hotel.Services).count())
+        self.table.setRowCount(len(services))
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(["ID", "Название", "Описание", "Цена"])
-        for i, (s) in enumerate(services):
-            service_id = QTableWidgetItem(str(s.id))
-            service_name = QTableWidgetItem(str(s.name))
-            service_descr = QTableWidgetItem(str(s.description))
-            service_price = QTableWidgetItem(str(s.price))
-            self.table.setItem(i, 0, service_id)
-            self.table.setItem(i, 1, service_name)
-            self.table.setItem(i, 2, service_descr)
-            self.table.setItem(i, 3, service_price)
 
-        self.table.show()
-        
-    def searchRoom(self, text):
-        self.table.clear()
-        self.onClickRoom(text)
-        
-        
-        
-    def getRooms(self, text=None):
+        for i, s in enumerate(services):
+            self.table.setItem(i, 0, QTableWidgetItem(str(s.id)))
+            self.table.setItem(i, 1, QTableWidgetItem(str(s.name)))
+            self.table.setItem(i, 2, QTableWidgetItem(str(s.description)))
+            self.table.setItem(i, 3, QTableWidgetItem(str(s.price)))
+
+    def getService(self, text=None):
+        query = self.db.query(hotel.Services)
         if text:
-            return self.db.query(hotel.Room).filter(hotel.Room.name.like(f"%{text}%")).all()
-        else:
-            return self.db.query(hotel.Room).all()
-        
-        
+            query = query.filter(hotel.Services.description.like(f"%{text}%"))
+        return query.all()
+
     def onClickBooking(self):
-        bookings = self.db.query(hotel.Questionnaire).all()
+        self.line_find.setPlaceholderText("Поиск по фамилии или названию комнаты")
+        self.combobox.clear()
+        self.combobox.addItems(self.room_list)
+        self.line_find.textChanged.connect(self.applyBookingFilters)
+        self.combobox.currentTextChanged.connect(self.applyBookingFilters)
+        self.applyBookingFilters()
+
+    def applyBookingFilters(self):
+        room_filter = self.combobox.currentText()
+        search_text = self.line_find.text()
+        bookings = self.getBookings(room_filter, search_text)
+
         self.table.clear()
-        self.table.setRowCount(self.db.query(hotel.Services).count())
+        self.table.setRowCount(len(bookings))
         self.table.setColumnCount(7)
-        self.table.setHorizontalHeaderLabels(["ID", "Гость", "Срокпроживания", "Комната", "Прибытие", "Отбытие", "Скидка"])
+        self.table.setHorizontalHeaderLabels(["ID", "Гость", "Срок проживания", "Комната", "Прибытие", "Отбытие", "Скидка"])
+
         for i, b in enumerate(bookings):
-            booking_id = QTableWidgetItem(str(b.id))
-            booking_guest = QTableWidgetItem(str(b.guest_str.last_name + " " + b.guest_str.first_name + " " + b.guest_str.middle_name))
-            booking_stay_until = QTableWidgetItem(str(b.stay_until))
-            booking_room = QTableWidgetItem(str(b.room_str.name))
-            booking_arrival = QTableWidgetItem(str(b.arrival))
-            booking_departure = QTableWidgetItem(str(b.departure))
-            booking_discount = QTableWidgetItem(str(b.discount))
-            self.table.setItem(i,0,booking_id)
-            self.table.setItem(i,1,booking_guest)
-            self.table.setItem(i,2,booking_stay_until)
-            self.table.setItem(i,3,booking_room)
-            self.table.setItem(i,4,booking_arrival)
-            self.table.setItem(i,5,booking_departure)
-            self.table.setItem(i,6,booking_discount)
-        self.table.show()
+            self.table.setItem(i, 0, QTableWidgetItem(str(b.id)))
+            self.table.setItem(i, 1, QTableWidgetItem(f"{b.guest_str.last_name} {b.guest_str.first_name} {b.guest_str.middle_name}"))
+            self.table.setItem(i, 2, QTableWidgetItem(str(b.stay_until)))
+            self.table.setItem(i, 3, QTableWidgetItem(str(b.room_str.name)))
+            self.table.setItem(i, 4, QTableWidgetItem(str(b.arrival)))
+            self.table.setItem(i, 5, QTableWidgetItem(str(b.departure)))
+            self.table.setItem(i, 6, QTableWidgetItem(str(b.discount)))
+
+    def getBookings(self, room_filter=None, search_text=None):
+        query = self.db.query(hotel.Questionnaire)
+
+        if room_filter and room_filter != "Любой":
+            query = query.filter(hotel.Questionnaire.room_str.name == room_filter)
+
+        if search_text:
+            query = query.filter(
+                or_(
+                    hotel.Questionnaire.room_str.name.like(f"%{search_text}%"),
+                    hotel.Questionnaire.guest_str.last_name.like(f"%{search_text}%")
+                )
+            )
+
+        return query.all()
 
     def closeEvent(self, event):
         self.db.close_all()
-        print("Closed")
-
+        print("Соединение закрыто")

@@ -42,7 +42,7 @@ class Guest(Base): # Определяем класс User, наследующи�
     birth_place = Column(String)
     passport = Column(Integer, ForeignKey(Passport.id))
     phone = Column(String)
-    gender = Column(Integer, ForeignKey(Gender.id))
+    gender_id = Column(Integer, ForeignKey(Gender.id))
     passport_str = relationship("Passport")
     questionnaire = relationship("Questionnaire", back_populates="guest_str")
     gender_str = relationship("Gender")
@@ -82,7 +82,7 @@ class Services_in_questionnaire(Base):
 
 def create_connection(login, base):
     # postgresql://admin:root@localhost:5432/hotel
-    engine = create_engine(f"postgresql://{login}@localhost:5432/{base}",
+    engine = create_engine(f"postgresql://admin:root@localhost:5432/hotel",
     echo = True) # Создаем объект Engine для подключения к базе данных
     Base.metadata.create_all(engine) # Создаем таблицу users в базе данных, если она еще не существует
     Session = sessionmaker(bind=engine) # Создаем фабрику сессий
