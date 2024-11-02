@@ -2,7 +2,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget, QTableWidgetItem, QLineEdit, QComboBox)
 import hotel
 from sqlalchemy import func, or_
-from sqlalchemy.orm import joinedload
+from add_window import AddWindow
 
 class MainWindow(QMainWindow):
     def __init__(self, login=None, base=None):
@@ -23,6 +23,9 @@ class MainWindow(QMainWindow):
         
         self.booking_button = QPushButton("Бронирования")
         self.booking_button.clicked.connect(self.onClickBooking)
+
+        self.add_button = QPushButton("Добавить записи")
+        self.add_button.clicked.connect(self.onClickAdd)
 
         # Поле ввода и фильтры
         self.line_find = QLineEdit()
@@ -197,6 +200,10 @@ class MainWindow(QMainWindow):
             )
 
         return query.all()
+
+    def onClickAdd(self):
+        self.add_window = AddWindow()
+        self.add_window.show()
 
     def closeEvent(self, event):
         self.db.close_all()
