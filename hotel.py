@@ -44,7 +44,7 @@ class Guest(Base): # Определяем класс User, наследующи�
     phone = Column(String)
     gender_id = Column(Integer, ForeignKey(Gender.id))
     passport_str = relationship("Passport")
-    questionnaire = relationship("Questionnaire", back_populates="guest_str")
+    questionnaire = relationship("Questionnaire", back_populates="guest_str", cascade="all,delete")
     gender_str = relationship("Gender")
 
 class Room(Base):
